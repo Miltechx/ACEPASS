@@ -1,44 +1,54 @@
-// AcePass — AI Tutor Chat Proxy
-// Routes chat requests through server so API key stays secure
-// Set ANTHROPIC_API_KEY in Vercel environment variables
+// api/chat.js — Vercel Serverless Function
+// Uses Groq free tier (llama-3.3-70b-versatile — fast and free)
 
-export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  if (req.method === "OPTIONS") return res.status(200).end();
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+module.exports = async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured in Vercel environment variables" });
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'GROQ_API_KEY not configured in Vercel environment variables.' });
 
-  const { messages, system } = req.body || {};
-  if (!messages || !Array.isArray(messages)) return res.status(400).json({ error: "messages array required" });
+  let body = req.body;
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch(e) { return res.status(400).json({ error: 'Invalid JSON.' }); }
+  }
+
+  const { system, messages } = body || {};
+  if (!messages || !Array.isArray(messages) || messages.length === 0)
+    return res.status(400).json({ error: 'No messages provided.' });
 
   try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + apiKey
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 1500,
-        system: system || "You are AcePass AI Tutor, an expert for Nigerian JAMB and Post-UTME exam preparation.",
-        messages: messages.slice(-10), // last 10 for context
-      }),
+        model: 'llama-3.3-70b-versatile',
+        max_tokens: 1024,
+        messages: [
+          { role: 'system', content: system || 'You are a helpful JAMB tutor for Nigerian students.' },
+          ...messages
+        ]
+      })
     });
 
     const data = await response.json();
-    if (data.error) return res.status(500).json({ error: data.error.message });
-    
-    const text = (data.content || []).map(c => c.text || "").join("");
-    return res.status(200).json({ reply: text });
+
+    if (!response.ok) {
+      console.error('Groq error:', response.status, JSON.stringify(data));
+      return res.status(502).json({ error: data?.error?.message || 'AI service error. Try again.' });
+    }
+
+    const reply = data?.choices?.[0]?.message?.content || 'No response generated.';
+    return res.status(200).json({ reply });
+
   } catch (err) {
-    console.error("Chat API error:", err);
-    return res.status(500).json({ error: "Failed to get response", detail: err.message });
+    console.error('Handler error:', err.message);
+    return res.status(500).json({ error: 'Server error: ' + err.message });
   }
-}
-// Note: Also handles AI question generation with ?mode=questions
+};

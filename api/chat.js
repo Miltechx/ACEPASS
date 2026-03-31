@@ -1,6 +1,3 @@
-// api/chat.js — Vercel Serverless Function
-// Uses Groq free tier (llama-3.3-70b-versatile — fast and free)
-
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -9,7 +6,7 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'GROQ_API_KEY not configured in Vercel environment variables.' });
+  if (!apiKey) return res.status(500).json({ error: 'GROQ_API_KEY not set in Vercel environment variables.' });
 
   let body = req.body;
   if (typeof body === 'string') {
@@ -38,7 +35,6 @@ module.exports = async function handler(req, res) {
     });
 
     const data = await response.json();
-
     if (!response.ok) {
       console.error('Groq error:', response.status, JSON.stringify(data));
       return res.status(502).json({ error: data?.error?.message || 'AI service error. Try again.' });

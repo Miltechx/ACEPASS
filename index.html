@@ -3167,8 +3167,6 @@ function submitPutme(){
 // AI CHATBOT
 // ══════════════════════════════════════════════════════════
 // OpenRouter free tier key — safe to expose in frontend (rate-limited per IP)
-const OPENROUTER_KEY = window.OPENROUTER_KEY || ''; // Set this from Vercel env via /api/config or get free key at openrouter.ai
-
 const CHAT_SYSTEM = `You are AcePass AI Tutor — an expert academic assistant specifically for Nigerian students preparing for JAMB UTME and Post-UTME examinations. 
 
 Your knowledge is strictly based on the official JAMB syllabus covering all 35 JAMB subjects including: Use of English, Mathematics, Physics, Chemistry, Biology, Government, Economics, Literature in English, Commerce, Geography, Christian Religious Studies, Islamic Religious Studies, Civic Education, Agricultural Science, Further Mathematics, Principles of Accounts, Computer Studies, History, Hausa, Igbo, Yoruba, Arabic, French, Music, Fine Arts, Food and Nutrition, Home Economics, Insurance, Marketing, Physical Education, Technical Drawing, Animal Husbandry, Catering Craft Practice, and Data Processing.
@@ -3239,23 +3237,13 @@ function scrollChat(){
 async function callChatAPI(userMsg,typingId){
   try{
     const msgs=[...chatHistory.slice(-8),{role:'user',content:userMsg}];
-    // Use OpenRouter free tier — no billing required
-    const res=await fetch('https://openrouter.ai/api/v1/chat/completions',{
+    const res=await fetch('/api/chat',{
       method:'POST',
-      headers:{
-        'Content-Type':'application/json',
-        'Authorization':'Bearer '+OPENROUTER_KEY,
-        'HTTP-Referer':'https://acepass.vercel.app',
-        'X-Title':'AcePass AI Tutor'
-      },
-      body:JSON.stringify({
-        model:'meta-llama/llama-3.3-8b-instruct:free',
-        max_tokens:1024,
-        messages:[{role:'system',content:CHAT_SYSTEM},...msgs]
-      })
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({system:CHAT_SYSTEM,messages:msgs})
     });
     const data=await res.json();
-    const reply=(data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content)||data.error?.message||"I couldn't generate a response. Please try again.";
+    const reply=data.reply||data.error||"I couldn't generate a response. Please try again.";
     const typingEl=document.getElementById(typingId);
     if(typingEl)typingEl.remove();
     appendMsg(formatAIReply(reply),'ai');
